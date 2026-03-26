@@ -127,29 +127,42 @@ async function saveFollowersToDB(
   type: 'all' | 'verified',
   followers: NormalizedFollower[]
 ) {
-  await Follower.deleteMany({ userId, type });
+  const fetchedAt = new Date();
+  const followerIds = followers.map((f) => f.id);
 
-  if (followers.length === 0) return;
+  // Remove stale records that are no longer part of the latest fetch.
+  if (followerIds.length === 0) {
+    await Follower.deleteMany({ userId, type });
+    return;
+  }
+  await Follower.deleteMany({ userId, type, followerId: { $nin: followerIds } });
 
-  const docs = followers.map((f) => ({
-    userId,
-    type,
-    followerId: f.id,
-    name: f.name,
-    screen_name: f.screen_name,
-    profile_image_url: f.profile_image_url,
-    description: f.description,
-    location: f.location,
-    followers_count: f.followers_count,
-    following_count: f.following_count,
-    tweet_count: f.tweet_count,
-    is_blue_verified: f.is_blue_verified,
-    verified: f.verified,
-    banner_url: f.banner_url,
-    fetchedAt: new Date(),
-  }));
-
-  await Follower.insertMany(docs, { ordered: false });
+  // Upsert each follower to avoid duplicate-key failures when concurrent refreshes overlap.
+  await Follower.bulkWrite(
+    followers.map((f) => ({
+      updateOne: {
+        filter: { userId, type, followerId: f.id },
+        update: {
+          $set: {
+            name: f.name,
+            screen_name: f.screen_name,
+            profile_image_url: f.profile_image_url,
+            description: f.description,
+            location: f.location,
+            followers_count: f.followers_count,
+            following_count: f.following_count,
+            tweet_count: f.tweet_count,
+            is_blue_verified: f.is_blue_verified,
+            verified: f.verified,
+            banner_url: f.banner_url,
+            fetchedAt,
+          },
+        },
+        upsert: true,
+      },
+    })),
+    { ordered: false }
+  );
 }
 
 function dbFollowerToNormalized(doc: any): NormalizedFollower {

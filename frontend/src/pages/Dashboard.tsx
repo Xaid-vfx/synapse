@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, BadgeCheck, LogOut, BarChart3, RefreshCw, AlertCircle, Loader2, Clock } from 'lucide-react';
-import { getMe, logout, streamAllFollowers, getRefreshStatus } from '../lib/api';
+import { Users, LogOut, BarChart3, RefreshCw, AlertCircle, Loader2, Clock } from 'lucide-react';
+import { getMe, logout, streamAllFollowers } from '../lib/api';
 import type { StreamDonePayload } from '../lib/api';
 import FollowerCard from '../components/FollowerCard';
-import type { AuthUser, TwitterFollower, FollowersTab } from '../types';
+import type { AuthUser, TwitterFollower } from '../types';
 
 function formatTimeRemaining(ms: number): string {
   if (ms <= 0) return '';
@@ -23,8 +23,6 @@ export default function Dashboard() {
   const [user, setUser] = useState<AuthUser | null>(null);
 
   const [allFollowers, setAllFollowers] = useState<TwitterFollower[]>([]);
-  const [verifiedFollowers, setVerifiedFollowers] = useState<TwitterFollower[]>([]);
-  const [activeTab, setActiveTab] = useState<FollowersTab>('all');
 
   const [fetching, setFetching] = useState(false);
   const [fetchedCount, setFetchedCount] = useState(0);
@@ -34,6 +32,7 @@ export default function Dashboard() {
 
   const [nextRefreshAt, setNextRefreshAt] = useState<string | null>(null);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [profileImageFailed, setProfileImageFailed] = useState(false);
 
   const stopRef = useRef<(() => void) | null>(null);
 
@@ -70,7 +69,6 @@ export default function Dashboard() {
     stopRef.current?.();
 
     setAllFollowers([]);
-    setVerifiedFollowers([]);
     setFetchedCount(0);
     setDone(false);
     setError(null);
@@ -85,20 +83,8 @@ export default function Dashboard() {
       },
       (payload) => {
         handleDone(payload);
-        const stopVerified = streamAllFollowers(
-          'verified',
-          (batch) => setVerifiedFollowers((prev) => [...prev, ...batch]),
-          (verPayload) => {
-            handleDone(verPayload);
-            setFetching(false);
-            setDone(true);
-          },
-          (msg) => {
-            setError(msg);
-            setFetching(false);
-          }
-        );
-        stopRef.current = stopVerified;
+        setFetching(false);
+        setDone(true);
       },
       (msg) => {
         setError(msg);
@@ -123,7 +109,7 @@ export default function Dashboard() {
   };
 
   const canRefresh = cooldownRemaining <= 0;
-  const currentFollowers = activeTab === 'all' ? allFollowers : verifiedFollowers;
+  const currentFollowers = allFollowers;
 
   if (!user) {
     return (
@@ -151,14 +137,15 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-            {user.profileImageUrl ? (
+            {user.profileImageUrl && !profileImageFailed ? (
               <img
-                src={user.profileImageUrl.replace('_normal', '_48x48')}
+                src={user.profileImageUrl.replace('_normal', '_200x200')}
                 alt={user.name}
-                className="w-8 h-8 rounded-full ring-2 ring-primary/20"
+                onError={() => setProfileImageFailed(true)}
+                className="w-10 h-10 rounded-full ring-2 ring-primary/30 object-cover shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-bg-elevated flex items-center justify-center text-primary font-bold text-xs">
+              <div className="w-10 h-10 rounded-full bg-bg-elevated flex items-center justify-center text-primary font-bold text-sm ring-2 ring-primary/20">
                 {user.name.charAt(0)}
               </div>
             )}
@@ -217,31 +204,14 @@ export default function Dashboard() {
 
         {/* Tabs + status bar */}
         <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-          <div className="flex gap-1 bg-bg-card rounded-xl p-1 border border-border-subtle">
-            {([
-              { key: 'all', label: 'All Followers', icon: Users, count: allFollowers.length },
-              { key: 'verified', label: 'Verified', icon: BadgeCheck, count: verifiedFollowers.length },
-            ] as const).map(({ key, label, icon: Icon, count }) => (
-              <button
-                key={key}
-                onClick={() => setActiveTab(key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                  activeTab === key
-                    ? 'bg-primary text-bg-dark shadow-md'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-                {count > 0 && (
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
-                    activeTab === key ? 'bg-bg-dark/20 text-bg-dark' : 'bg-bg-elevated text-slate-300'
-                  }`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 px-4 py-2 bg-bg-card rounded-xl border border-border-subtle text-sm font-semibold">
+            <Users className="w-4 h-4 text-primary" />
+            All Followers
+            {allFollowers.length > 0 && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full font-bold bg-bg-elevated text-slate-300">
+                {allFollowers.length}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -323,9 +293,7 @@ export default function Dashboard() {
               <Users className="w-7 h-7 text-slate-500" />
             </div>
             <p className="text-slate-400 font-semibold">No followers found</p>
-            <p className="text-slate-500 text-sm mt-1">
-              {activeTab === 'verified' ? "No verified followers yet." : "Your follower list is empty."}
-            </p>
+            <p className="text-slate-500 text-sm mt-1">Your follower list is empty.</p>
           </div>
         )}
       </main>
