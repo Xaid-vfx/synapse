@@ -83,7 +83,7 @@ export default function LoginPage() {
 
           {/* Sign in button */}
           <a
-            href="/auth/twitter"
+            href={`${import.meta.env.VITE_API_URL ?? ''}/auth/twitter`}
             className="flex items-center justify-center gap-3 w-full bg-white text-black font-bold py-3.5 px-6 rounded-xl hover:bg-slate-100 transition-all duration-200 text-sm"
           >
             {/* X (Twitter) logo */}

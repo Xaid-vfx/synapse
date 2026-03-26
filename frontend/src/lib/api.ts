@@ -1,8 +1,12 @@
 import axios from 'axios';
 import type { AuthUser, FollowersApiResponse, TwitterFollower } from '../types';
 
+// In dev, Vite proxies /auth and /api to localhost:3001
+// In production, VITE_API_URL points to the Railway backend
+const BASE_URL = import.meta.env.VITE_API_URL ?? '';
+
 const api = axios.create({
-  baseURL: '/',
+  baseURL: BASE_URL,
   withCredentials: true,
 });
 
@@ -29,19 +33,15 @@ export async function getVerifiedFollowers(cursor?: string): Promise<FollowersAp
   return res.data;
 }
 
-/**
- * Stream ALL followers via SSE. Calls onBatch for each page received,
- * onDone when complete, onError on failure.
- * Returns a cleanup function to abort the stream.
- */
 export function streamAllFollowers(
   type: 'all' | 'verified',
   onBatch: (followers: TwitterFollower[], total: number) => void,
   onDone: (total: number) => void,
   onError: (msg: string) => void
 ): () => void {
-  const url = type === 'verified' ? '/api/verified-followers/all' : '/api/followers/all';
-  const es = new EventSource(url);
+  const path = type === 'verified' ? '/api/verified-followers/all' : '/api/followers/all';
+  // withCredentials required for cross-domain SSE session cookies
+  const es = new EventSource(`${BASE_URL}${path}`, { withCredentials: true });
 
   es.addEventListener('followers', (e) => {
     const data = JSON.parse(e.data) as { followers: TwitterFollower[]; total: number };
@@ -64,7 +64,6 @@ export function streamAllFollowers(
     es.close();
   });
 
-  // Native SSE error (connection dropped etc.)
   es.onerror = () => {
     onError('Connection lost. Please try again.');
     es.close();
