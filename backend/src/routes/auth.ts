@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { TwitterApi } from 'twitter-api-v2';
 import dotenv from 'dotenv';
+import User from '../models/User';
 
 dotenv.config();
 
@@ -62,13 +63,27 @@ router.get('/twitter/callback', async (req: Request, res: Response) => {
       'user.fields': ['profile_image_url', 'public_metrics', 'description', 'verified'],
     });
 
+    const dbUser = await User.findOneAndUpdate(
+      { twitterId: userObject.id },
+      {
+        name: userObject.name,
+        username: userObject.username,
+        profileImageUrl: userObject.profile_image_url,
+        description: (userObject as any).description,
+        publicMetrics: (userObject as any).public_metrics,
+        accessToken,
+        ...(refreshToken ? { refreshToken } : {}),
+      },
+      { upsert: true, new: true }
+    );
+
     req.session.user = {
-      id: userObject.id,
-      name: userObject.name,
-      username: userObject.username,
-      profileImageUrl: userObject.profile_image_url,
-      description: (userObject as any).description,
-      publicMetrics: (userObject as any).public_metrics,
+      id: dbUser.twitterId,
+      name: dbUser.name,
+      username: dbUser.username,
+      profileImageUrl: dbUser.profileImageUrl,
+      description: dbUser.description,
+      publicMetrics: dbUser.publicMetrics,
     };
     req.session.accessToken = accessToken;
     if (refreshToken) req.session.refreshToken = refreshToken;

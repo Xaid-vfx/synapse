@@ -31,4 +31,10 @@ export interface FollowersApiResponse {
   next_cursor: string | null;
 }
 
+export interface RefreshStatus {
+  canRefresh: boolean;
+  nextRefreshAt?: string;
+  lastFetchedAt?: string;
+}
+
 export type FollowersTab = 'all' | 'verified';

@@ -1,9 +1,22 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, BadgeCheck, LogOut, BarChart3, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
-import { getMe, logout, streamAllFollowers } from '../lib/api';
+import { Users, BadgeCheck, LogOut, BarChart3, RefreshCw, AlertCircle, Loader2, Clock } from 'lucide-react';
+import { getMe, logout, streamAllFollowers, getRefreshStatus } from '../lib/api';
+import type { StreamDonePayload } from '../lib/api';
 import FollowerCard from '../components/FollowerCard';
 import type { AuthUser, TwitterFollower, FollowersTab } from '../types';
+
+function formatTimeRemaining(ms: number): string {
+  if (ms <= 0) return '';
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+  return parts.join(' ');
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -17,18 +30,43 @@ export default function Dashboard() {
   const [fetchedCount, setFetchedCount] = useState(0);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState(false);
+
+  const [nextRefreshAt, setNextRefreshAt] = useState<string | null>(null);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
   const stopRef = useRef<(() => void) | null>(null);
 
-  // Load user info
   useEffect(() => {
     getMe()
       .then(setUser)
       .catch(() => navigate('/', { replace: true }));
   }, [navigate]);
 
+  // Tick the cooldown timer every minute
+  useEffect(() => {
+    if (!nextRefreshAt) {
+      setCooldownRemaining(0);
+      return;
+    }
+    const calc = () => Math.max(0, new Date(nextRefreshAt).getTime() - Date.now());
+    setCooldownRemaining(calc());
+    const interval = setInterval(() => {
+      const remaining = calc();
+      setCooldownRemaining(remaining);
+      if (remaining <= 0) clearInterval(interval);
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [nextRefreshAt]);
+
+  const handleDone = useCallback((payload: StreamDonePayload) => {
+    setFromCache(payload.fromCache);
+    if (payload.nextRefreshAt) {
+      setNextRefreshAt(payload.nextRefreshAt);
+    }
+  }, []);
+
   const startFetch = useCallback(() => {
-    // Stop any in-progress stream
     stopRef.current?.();
 
     setAllFollowers([]);
@@ -37,20 +75,21 @@ export default function Dashboard() {
     setDone(false);
     setError(null);
     setFetching(true);
+    setFromCache(false);
 
-    // Stream all followers
     const stopAll = streamAllFollowers(
       'all',
       (batch, total) => {
         setAllFollowers((prev) => [...prev, ...batch]);
         setFetchedCount(total);
       },
-      () => {
-        // All followers done — now stream verified
+      (payload) => {
+        handleDone(payload);
         const stopVerified = streamAllFollowers(
           'verified',
           (batch) => setVerifiedFollowers((prev) => [...prev, ...batch]),
-          () => {
+          (verPayload) => {
+            handleDone(verPayload);
             setFetching(false);
             setDone(true);
           },
@@ -68,14 +107,13 @@ export default function Dashboard() {
     );
 
     stopRef.current = stopAll;
-  }, []);
+  }, [handleDone]);
 
   // Auto-start when user loads
   useEffect(() => {
     if (user) startFetch();
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cleanup on unmount
   useEffect(() => () => stopRef.current?.(), []);
 
   const handleLogout = async () => {
@@ -84,6 +122,7 @@ export default function Dashboard() {
     navigate('/', { replace: true });
   };
 
+  const canRefresh = cooldownRemaining <= 0;
   const currentFollowers = activeTab === 'all' ? allFollowers : verifiedFollowers;
 
   if (!user) {
@@ -210,18 +249,30 @@ export default function Dashboard() {
             {fetching && (
               <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2 rounded-lg">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Fetching followers… {fetchedCount > 0 && <span className="font-bold">{fetchedCount} so far</span>}
+                {fromCache ? 'Loading from cache…' : 'Fetching followers…'}{' '}
+                {fetchedCount > 0 && <span className="font-bold">{fetchedCount} so far</span>}
               </div>
             )}
             {done && (
               <div className="text-xs text-slate-400 bg-bg-card border border-border-subtle px-3 py-2 rounded-lg">
                 {allFollowers.length.toLocaleString()} followers loaded
+                {fromCache && ' (cached)'}
               </div>
             )}
+
+            {/* Cooldown indicator */}
+            {!canRefresh && !fetching && (
+              <div className="flex items-center gap-1.5 text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 px-3 py-2 rounded-lg">
+                <Clock className="w-3.5 h-3.5" />
+                Refresh in {formatTimeRemaining(cooldownRemaining)}
+              </div>
+            )}
+
             <button
               onClick={startFetch}
-              disabled={fetching}
-              className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-white/5 border border-border-subtle disabled:opacity-40"
+              disabled={fetching || !canRefresh}
+              title={!canRefresh ? `Next refresh available in ${formatTimeRemaining(cooldownRemaining)}` : 'Refresh followers'}
+              className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-white/5 border border-border-subtle disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${fetching ? 'animate-spin' : ''}`} />
               Refresh

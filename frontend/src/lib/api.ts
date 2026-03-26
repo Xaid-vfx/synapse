@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { AuthUser, FollowersApiResponse, TwitterFollower } from '../types';
+import type { AuthUser, FollowersApiResponse, RefreshStatus, TwitterFollower } from '../types';
 
 // In dev, Vite proxies /auth and /api to localhost:3001
 // In production, VITE_API_URL points to the Railway backend
@@ -37,14 +37,24 @@ export async function getVerifiedFollowers(cursor?: string): Promise<FollowersAp
   return res.data;
 }
 
+export async function getRefreshStatus(): Promise<RefreshStatus> {
+  const res = await api.get<RefreshStatus>('/api/refresh-status');
+  return res.data;
+}
+
+export interface StreamDonePayload {
+  total: number;
+  fromCache: boolean;
+  nextRefreshAt?: string;
+}
+
 export function streamAllFollowers(
   type: 'all' | 'verified',
   onBatch: (followers: TwitterFollower[], total: number) => void,
-  onDone: (total: number) => void,
+  onDone: (payload: StreamDonePayload) => void,
   onError: (msg: string) => void
 ): () => void {
   const path = type === 'verified' ? '/api/verified-followers/all' : '/api/followers/all';
-  // withCredentials required for cross-domain SSE session cookies
   const es = new EventSource(`${BASE_URL}${path}`, { withCredentials: true });
 
   es.addEventListener('followers', (e) => {
@@ -53,8 +63,8 @@ export function streamAllFollowers(
   });
 
   es.addEventListener('done', (e) => {
-    const data = JSON.parse(e.data) as { total: number };
-    onDone(data.total);
+    const data = JSON.parse(e.data) as StreamDonePayload;
+    onDone(data);
     es.close();
   });
 

@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
+import User from '../models/User';
+import Follower from '../models/Follower';
 
 dotenv.config();
 
@@ -8,8 +10,9 @@ const router = Router();
 
 const RAPIDAPI_HOST = 'twitter283.p.rapidapi.com';
 const RAPIDAPI_BASE = `https://${RAPIDAPI_HOST}`;
-const MAX_PAGES = 100; // safety cap (~2000 followers)
-const PAGE_DELAY_MS = 300; // be nice to the API
+const MAX_PAGES = 100;
+const PAGE_DELAY_MS = 300;
+const REFRESH_COOLDOWN_MS = 15 * 24 * 60 * 60 * 1000; // 15 days
 
 function getHeaders() {
   return {
@@ -70,13 +73,11 @@ function parseTimelineResponse(rawData: any): {
       for (const entry of instruction.entries ?? []) {
         const content = entry?.content;
 
-        // Cursor entry
         if (content?.__typename === 'TimelineTimelineCursor' && content?.cursor_type === 'Bottom') {
           next_cursor = content.value ?? null;
           continue;
         }
 
-        // User entry
         if (content?.__typename === 'TimelineTimelineItem') {
           const userResults = content?.content?.user_results;
           if (!userResults) continue;
@@ -121,9 +122,57 @@ async function fetchOnePage(endpoint: string, userId: string, cursor?: string) {
   return parseTimelineResponse(response.data);
 }
 
-// --- SSE: stream all followers page by page ---
+async function saveFollowersToDB(
+  userId: string,
+  type: 'all' | 'verified',
+  followers: NormalizedFollower[]
+) {
+  await Follower.deleteMany({ userId, type });
+
+  if (followers.length === 0) return;
+
+  const docs = followers.map((f) => ({
+    userId,
+    type,
+    followerId: f.id,
+    name: f.name,
+    screen_name: f.screen_name,
+    profile_image_url: f.profile_image_url,
+    description: f.description,
+    location: f.location,
+    followers_count: f.followers_count,
+    following_count: f.following_count,
+    tweet_count: f.tweet_count,
+    is_blue_verified: f.is_blue_verified,
+    verified: f.verified,
+    banner_url: f.banner_url,
+    fetchedAt: new Date(),
+  }));
+
+  await Follower.insertMany(docs, { ordered: false });
+}
+
+function dbFollowerToNormalized(doc: any): NormalizedFollower {
+  return {
+    id: doc.followerId,
+    name: doc.name,
+    screen_name: doc.screen_name,
+    profile_image_url: doc.profile_image_url,
+    description: doc.description,
+    location: doc.location,
+    followers_count: doc.followers_count,
+    following_count: doc.following_count,
+    tweet_count: doc.tweet_count,
+    is_blue_verified: doc.is_blue_verified,
+    verified: doc.verified,
+    banner_url: doc.banner_url,
+  };
+}
+
+// SSE: stream all followers — fetches from API only if allowed, otherwise serves from DB
 async function streamAllFollowers(
   endpoint: string,
+  type: 'all' | 'verified',
   userId: string,
   res: Response
 ) {
@@ -136,9 +185,39 @@ async function streamAllFollowers(
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
+  const dbUser = await User.findOne({ twitterId: userId });
+  const lastFetchField = type === 'verified' ? 'lastVerifiedFetchAt' : 'lastFollowersFetchAt';
+  const lastFetch = dbUser?.[lastFetchField];
+
+  const cooldownRemaining = lastFetch
+    ? REFRESH_COOLDOWN_MS - (Date.now() - new Date(lastFetch).getTime())
+    : 0;
+
+  // If within cooldown, serve from DB
+  if (cooldownRemaining > 0) {
+    const cached = await Follower.find({ userId, type }).lean();
+
+    if (cached.length > 0) {
+      const BATCH_SIZE = 20;
+      let total = 0;
+      for (let i = 0; i < cached.length; i += BATCH_SIZE) {
+        const batch = cached.slice(i, i + BATCH_SIZE).map(dbFollowerToNormalized);
+        total += batch.length;
+        send('followers', { followers: batch, total });
+      }
+    }
+
+    const nextRefreshAt = new Date(new Date(lastFetch!).getTime() + REFRESH_COOLDOWN_MS).toISOString();
+    send('done', { total: cached.length, fromCache: true, nextRefreshAt });
+    res.end();
+    return;
+  }
+
+  // Fetch fresh from RapidAPI
   let cursor: string | undefined;
   let page = 0;
   let total = 0;
+  const allFetched: NormalizedFollower[] = [];
 
   try {
     while (page < MAX_PAGES) {
@@ -146,17 +225,25 @@ async function streamAllFollowers(
 
       if (followers.length > 0) {
         total += followers.length;
+        allFetched.push(...followers);
         send('followers', { followers, total });
       }
 
       if (!next_cursor) break;
-
       cursor = next_cursor;
       page++;
       await sleep(PAGE_DELAY_MS);
     }
 
-    send('done', { total });
+    await saveFollowersToDB(userId, type, allFetched);
+
+    await User.updateOne(
+      { twitterId: userId },
+      { [lastFetchField]: new Date() }
+    );
+
+    const nextRefreshAt = new Date(Date.now() + REFRESH_COOLDOWN_MS).toISOString();
+    send('done', { total, fromCache: false, nextRefreshAt });
   } catch (err: any) {
     console.error(`${endpoint} stream error:`, err.response?.data || err.message);
     send('error', { message: err.response?.data?.message || err.message });
@@ -165,7 +252,7 @@ async function streamAllFollowers(
   }
 }
 
-// Fetch single page (kept for backward compat)
+// Fetch single page (backward compat)
 router.get('/followers', requireAuth, async (req: Request, res: Response) => {
   const userId = req.session.user!.id;
   const { cursor } = req.query;
@@ -188,13 +275,40 @@ router.get('/verified-followers', requireAuth, async (req: Request, res: Respons
   }
 });
 
-// SSE: stream ALL followers at once
+// SSE: stream ALL followers (with 15-day cooldown + DB caching)
 router.get('/followers/all', requireAuth, (req: Request, res: Response) => {
-  streamAllFollowers('UserFollowers', req.session.user!.id, res);
+  streamAllFollowers('UserFollowers', 'all', req.session.user!.id, res);
 });
 
 router.get('/verified-followers/all', requireAuth, (req: Request, res: Response) => {
-  streamAllFollowers('UserVerifiedFollowers', req.session.user!.id, res);
+  streamAllFollowers('UserVerifiedFollowers', 'verified', req.session.user!.id, res);
+});
+
+// Refresh status: lets frontend know when the next refresh is allowed
+router.get('/refresh-status', requireAuth, async (req: Request, res: Response) => {
+  const userId = req.session.user!.id;
+  const dbUser = await User.findOne({ twitterId: userId });
+
+  if (!dbUser) {
+    return res.json({ canRefresh: true });
+  }
+
+  const lastFetch = dbUser.lastFollowersFetchAt;
+  if (!lastFetch) {
+    return res.json({ canRefresh: true });
+  }
+
+  const cooldownRemaining = REFRESH_COOLDOWN_MS - (Date.now() - new Date(lastFetch).getTime());
+
+  if (cooldownRemaining <= 0) {
+    return res.json({ canRefresh: true });
+  }
+
+  return res.json({
+    canRefresh: false,
+    nextRefreshAt: new Date(new Date(lastFetch).getTime() + REFRESH_COOLDOWN_MS).toISOString(),
+    lastFetchedAt: lastFetch.toISOString(),
+  });
 });
 
 export default router;
