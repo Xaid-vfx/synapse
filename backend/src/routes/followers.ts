@@ -3,6 +3,7 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import User from '../models/User';
 import Follower from '../models/Follower';
+import { triggerEnrichment } from '../services/enrichmentService';
 
 dotenv.config();
 
@@ -54,6 +55,7 @@ export interface NormalizedFollower {
   is_blue_verified: boolean;
   verified: boolean;
   banner_url: string | null;
+  created_at: string | null;
 }
 
 function parseTimelineResponse(rawData: any): {
@@ -99,6 +101,7 @@ function parseTimelineResponse(rawData: any): {
             is_blue_verified: u.verification?.is_blue_verified ?? false,
             verified: u.verification?.verified ?? false,
             banner_url: u.banner?.image_url ?? null,
+            created_at: u.core?.created_at ?? null,
           });
         }
       }
@@ -155,6 +158,7 @@ async function saveFollowersToDB(
             is_blue_verified: f.is_blue_verified,
             verified: f.verified,
             banner_url: f.banner_url,
+            created_at: f.created_at,
             fetchedAt,
           },
         },
@@ -179,6 +183,7 @@ function dbFollowerToNormalized(doc: any): NormalizedFollower {
     is_blue_verified: doc.is_blue_verified,
     verified: doc.verified,
     banner_url: doc.banner_url,
+    created_at: doc.created_at ?? null,
   };
 }
 
@@ -254,6 +259,13 @@ async function streamAllFollowers(
       { twitterId: userId },
       { [lastFetchField]: new Date() }
     );
+
+    // Trigger background enrichment pipeline after fresh sync
+    if (type === 'all') {
+      triggerEnrichment(userId).catch((err) =>
+        console.error('[Enrichment] Auto-trigger failed:', err.message),
+      );
+    }
 
     const nextRefreshAt = new Date(Date.now() + REFRESH_COOLDOWN_MS).toISOString();
     send('done', { total, fromCache: false, nextRefreshAt });

@@ -7,6 +7,8 @@ import dotenv from 'dotenv';
 import { connectDB } from './db';
 import authRouter from './routes/auth';
 import followersRouter from './routes/followers';
+import searchRouter from './routes/search';
+import enrichmentRouter from './routes/enrichment';
 
 dotenv.config();
 
@@ -39,6 +41,8 @@ app.use(session({
 
 app.use('/auth', authRouter);
 app.use('/api', followersRouter);
+app.use('/api', searchRouter);
+app.use('/api', enrichmentRouter);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });

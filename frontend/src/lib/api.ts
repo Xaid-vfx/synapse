@@ -1,8 +1,14 @@
 import axios from 'axios';
-import type { AuthUser, FollowersApiResponse, RefreshStatus, TwitterFollower } from '../types';
+import type {
+  AuthUser,
+  FollowersApiResponse,
+  RefreshStatus,
+  TwitterFollower,
+  SearchResponse,
+  EnrichmentProgress,
+  EnrichmentStatusResponse,
+} from '../types';
 
-// In dev, Vite proxies /auth and /api to localhost:3001
-// In production, VITE_API_URL points to the Railway backend
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 const api = axios.create({
@@ -10,9 +16,11 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
 export async function getMe(): Promise<AuthUser> {
   const res = await api.get<AuthUser>('/auth/me');
-  // Guard against Vercel catch-all returning index.html as a 200
   if (!res.data?.id || !res.data?.username) {
     throw new Error('Not authenticated');
   }
@@ -23,6 +31,9 @@ export async function logout(): Promise<void> {
   await api.post('/auth/logout');
 }
 
+// ---------------------------------------------------------------------------
+// Followers (existing)
+// ---------------------------------------------------------------------------
 export async function getFollowers(cursor?: string): Promise<FollowersApiResponse> {
   const params: Record<string, string> = {};
   if (cursor) params.cursor = cursor;
@@ -52,7 +63,7 @@ export function streamAllFollowers(
   type: 'all' | 'verified',
   onBatch: (followers: TwitterFollower[], total: number) => void,
   onDone: (payload: StreamDonePayload) => void,
-  onError: (msg: string) => void
+  onError: (msg: string) => void,
 ): () => void {
   const path = type === 'verified' ? '/api/verified-followers/all' : '/api/followers/all';
   const es = new EventSource(`${BASE_URL}${path}`, { withCredentials: true });
@@ -84,4 +95,49 @@ export function streamAllFollowers(
   };
 
   return () => es.close();
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+export async function searchFollowers(
+  query: string,
+  limit = 20,
+): Promise<SearchResponse> {
+  const res = await api.get<SearchResponse>('/api/search', {
+    params: { q: query, limit },
+  });
+  return res.data;
+}
+
+export async function getSearchSuggestions(
+  query: string,
+): Promise<string[]> {
+  const res = await api.get<{ suggestions: string[] }>('/api/search/suggestions', {
+    params: { q: query },
+  });
+  return res.data.suggestions;
+}
+
+// ---------------------------------------------------------------------------
+// Enrichment
+// ---------------------------------------------------------------------------
+export async function getEnrichmentStatus(): Promise<EnrichmentStatusResponse> {
+  const res = await api.get<EnrichmentStatusResponse>('/api/enrichment/status');
+  return res.data;
+}
+
+export async function getEnrichmentProgress(): Promise<EnrichmentProgress> {
+  const res = await api.get<EnrichmentProgress>('/api/enrichment/progress');
+  return res.data;
+}
+
+export async function triggerEnrichment(): Promise<{ jobId: string; message: string }> {
+  const res = await api.post<{ jobId: string; message: string }>('/api/enrichment/trigger');
+  return res.data;
+}
+
+export async function retryFailedEnrichment(): Promise<{ count: number; message: string }> {
+  const res = await api.post<{ count: number; message: string }>('/api/enrichment/retry-failed');
+  return res.data;
 }
