@@ -12,6 +12,10 @@ const api = axios.create({
 
 export async function getMe(): Promise<AuthUser> {
   const res = await api.get<AuthUser>('/auth/me');
+  // Guard against Vercel catch-all returning index.html as a 200
+  if (!res.data?.id || !res.data?.username) {
+    throw new Error('Not authenticated');
+  }
   return res.data;
 }
 
