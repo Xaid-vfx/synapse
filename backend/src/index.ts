@@ -22,15 +22,24 @@ app.use(cors({
 
 app.use(express.json());
 
+const mongoUrl = process.env.MONGODB_URI;
+if (!mongoUrl && process.env.NODE_ENV === 'production') {
+  console.warn(
+    '⚠️ MONGODB_URI is not set; using in-memory sessions until it is configured in Cloud Run.',
+  );
+}
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-change-in-production',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: process.env.MONGODB_URI!,
-    collectionName: 'sessions',
-    ttl: 30 * 24 * 60 * 60, // 30 days
-  }),
+  store: mongoUrl
+    ? MongoStore.create({
+        mongoUrl,
+        collectionName: 'sessions',
+        ttl: 30 * 24 * 60 * 60, // 30 days
+      })
+    : undefined,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
