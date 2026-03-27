@@ -39,9 +39,10 @@ export default function PlaygroundPage() {
         const data = await getPlaygroundData(username, 1, 100);
         setOwner(data.owner);
         setFollowers(data.followers);
-        setCurrentPage(data.pagination.page);
-        setTotalFollowers(data.pagination.total);
-        setHasMoreFollowers(data.pagination.hasMore);
+        const pagination = data.pagination;
+        setCurrentPage(pagination?.page ?? 1);
+        setTotalFollowers(pagination?.total ?? data.followers.length);
+        setHasMoreFollowers(pagination?.hasMore ?? false);
       } catch (err: any) {
         setError(err?.response?.data?.error || 'Unable to load playground data');
       } finally {
@@ -86,9 +87,10 @@ export default function PlaygroundPage() {
       const nextPage = currentPage + 1;
       const data = await getPlaygroundData(username, nextPage, 100);
       setFollowers((prev) => [...prev, ...data.followers]);
-      setCurrentPage(data.pagination.page);
-      setTotalFollowers(data.pagination.total);
-      setHasMoreFollowers(data.pagination.hasMore);
+      const pagination = data.pagination;
+      setCurrentPage(pagination?.page ?? nextPage);
+      setTotalFollowers(pagination?.total ?? followers.length + data.followers.length);
+      setHasMoreFollowers(pagination?.hasMore ?? false);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Unable to load more followers');
     } finally {
