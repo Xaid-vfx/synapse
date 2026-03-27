@@ -91,6 +91,10 @@ export async function semanticSearch(
   userId: string,
   query: string,
   limit = ENRICHMENT_CONFIG.SEARCH_DEFAULT_LIMIT,
+  options?: {
+    vectorLimit?: number;
+    numCandidates?: number;
+  },
 ): Promise<SearchResponse> {
   const startedAt = Date.now();
   console.log(
@@ -112,6 +116,14 @@ export async function semanticSearch(
   );
 
   let candidates: any[];
+  const vectorLimit = Math.max(
+    effectiveLimit,
+    options?.vectorLimit ?? ENRICHMENT_CONFIG.VECTOR_DEFAULT_K,
+  );
+  const vectorNumCandidates = Math.max(
+    vectorLimit,
+    options?.numCandidates ?? ENRICHMENT_CONFIG.VECTOR_NUM_CANDIDATES,
+  );
 
   try {
     const vectorStart = Date.now();
@@ -121,8 +133,8 @@ export async function semanticSearch(
           index: ENRICHMENT_CONFIG.VECTOR_INDEX_NAME,
           path: 'semantic.embedding',
           queryVector: queryEmbedding,
-          numCandidates: ENRICHMENT_CONFIG.VECTOR_NUM_CANDIDATES,
-          limit: ENRICHMENT_CONFIG.VECTOR_DEFAULT_K,
+          numCandidates: vectorNumCandidates,
+          limit: vectorLimit,
           filter: { userId },
         },
       },

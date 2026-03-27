@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type ComponentType, useState } from 'react';
 import {
   Users,
   FileText,
@@ -16,6 +16,14 @@ import type { SearchResult } from '../types';
 interface Props {
   result: SearchResult;
   rank: number;
+}
+
+interface MetricInfo {
+  label: string;
+  value: number;
+  color: string;
+  description: string;
+  icon: ComponentType<{ className?: string }>;
 }
 
 function formatCount(n: number): string {
@@ -41,6 +49,36 @@ export default function SearchResultCard({ result, rank }: Props) {
   const twitterUrl = `https://twitter.com/${result.screen_name}`;
   const avatarUrl = result.profile_image_url?.replace('_normal', '_400x400') ?? null;
   const { scoreBreakdown } = result;
+  const metricItems: MetricInfo[] = [
+    {
+      label: 'Semantic',
+      value: scoreBreakdown.semantic,
+      icon: Sparkles,
+      color: 'text-violet-400',
+      description: 'How strongly their bio/topics semantically match your query intent.',
+    },
+    {
+      label: 'Reputation',
+      value: scoreBreakdown.reputation,
+      icon: TrendingUp,
+      color: 'text-emerald-400',
+      description: 'Authority/credibility signal from follower quality and profile strength.',
+    },
+    {
+      label: 'Recency',
+      value: scoreBreakdown.recency,
+      icon: Clock,
+      color: 'text-sky-400',
+      description: 'Freshness signal favoring more recently active and relevant accounts.',
+    },
+    {
+      label: 'Intent',
+      value: scoreBreakdown.intentBoost,
+      icon: Target,
+      color: 'text-amber-400',
+      description: 'Extra boost when explicit intent cues align with your search phrase.',
+    },
+  ];
 
   return (
     <div className="glass rounded-xl p-4 flex flex-col gap-3 hover:border-primary/30 transition-colors duration-200 group">
@@ -67,12 +105,12 @@ export default function SearchResultCard({ result, rank }: Props) {
         )}
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <a
               href={twitterUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-bold text-sm text-white hover:text-primary transition-colors truncate"
+              className="font-bold text-sm text-white hover:text-primary transition-colors truncate max-w-full"
             >
               {result.name}
             </a>
@@ -85,6 +123,7 @@ export default function SearchResultCard({ result, rank }: Props) {
 
         {/* Score badge */}
         <div
+          title="Final ranking score out of 100 after combining all matching signals."
           className={`px-2.5 py-1 rounded-lg border text-xs font-bold ${scoreBg(scoreBreakdown.finalScore)} ${scoreColor(scoreBreakdown.finalScore)}`}
         >
           {(scoreBreakdown.finalScore * 100).toFixed(0)}
@@ -126,18 +165,21 @@ export default function SearchResultCard({ result, rank }: Props) {
 
       {/* Stats */}
       <div className="flex items-center gap-4 pt-2 border-t border-white/5">
-        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+        <div className="flex items-center gap-1.5 text-xs text-slate-400 min-w-0">
           <Users className="w-3 h-3 text-primary/70" />
           <span className="font-semibold text-white">{formatCount(result.followers_count)}</span>
           <span>followers</span>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+        <div className="flex items-center gap-1.5 text-xs text-slate-400 min-w-0">
           <FileText className="w-3 h-3 text-primary/70" />
           <span className="font-semibold text-white">{formatCount(result.tweet_count)}</span>
           <span>tweets</span>
         </div>
         {result.reputationScore > 0 && (
-          <div className="ml-auto flex items-center gap-1 text-xs text-slate-400">
+          <div
+            title="Profile reputation signal used as part of ranking."
+            className="ml-auto flex items-center gap-1 text-xs text-slate-400 shrink-0"
+          >
             <TrendingUp className="w-3 h-3 text-emerald-400/70" />
             <span className="font-semibold text-emerald-400">{result.reputationScore}</span>
             <span>rep</span>
@@ -156,17 +198,16 @@ export default function SearchResultCard({ result, rank }: Props) {
 
       {expanded && (
         <div className="space-y-3 pt-1 animate-in fade-in duration-200">
+          <p className="text-[11px] text-slate-500">
+            Hover each score to see what it means.
+          </p>
           {/* Score breakdown */}
           <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: 'Semantic', value: scoreBreakdown.semantic, icon: Sparkles, color: 'text-violet-400' },
-              { label: 'Reputation', value: scoreBreakdown.reputation, icon: TrendingUp, color: 'text-emerald-400' },
-              { label: 'Recency', value: scoreBreakdown.recency, icon: Clock, color: 'text-sky-400' },
-              { label: 'Intent', value: scoreBreakdown.intentBoost, icon: Target, color: 'text-amber-400' },
-            ].map(({ label, value, icon: Icon, color }) => (
+            {metricItems.map(({ label, value, icon: Icon, color, description }) => (
               <div
                 key={label}
-                className="flex items-center gap-2 bg-bg-elevated/50 rounded-lg px-2.5 py-1.5"
+                title={description}
+                className="flex items-center gap-2 bg-bg-elevated/50 rounded-lg px-2.5 py-1.5 min-w-0"
               >
                 <Icon className={`w-3 h-3 ${color}`} />
                 <span className="text-[11px] text-slate-400">{label}</span>

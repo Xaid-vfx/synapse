@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
+import { requirePaidAccess } from '../middleware/access';
 import {
   semanticSearch,
   getSearchSuggestions,
@@ -8,7 +9,7 @@ import { ENRICHMENT_CONFIG } from '../config/enrichment';
 
 const router = Router();
 
-router.get('/search', requireAuth, async (req: Request, res: Response) => {
+router.get('/search', requireAuth, requirePaidAccess, async (req: Request, res: Response) => {
   const reqStart = Date.now();
   const reqId = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   try {
@@ -45,7 +46,7 @@ router.get('/search', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.get('/search/suggestions', requireAuth, async (req: Request, res: Response) => {
+router.get('/search/suggestions', requireAuth, requirePaidAccess, async (req: Request, res: Response) => {
   try {
     const query = (req.query.q as string)?.trim();
     if (!query) return res.json({ suggestions: [] });

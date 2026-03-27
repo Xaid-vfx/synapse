@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import User from '../models/User';
 import Follower from '../models/Follower';
 import { triggerEnrichment } from '../services/enrichmentService';
+import { requirePaidAccess } from '../middleware/access';
 
 dotenv.config();
 
@@ -11,7 +12,6 @@ const router = Router();
 
 const RAPIDAPI_HOST = 'twitter283.p.rapidapi.com';
 const RAPIDAPI_BASE = `https://${RAPIDAPI_HOST}`;
-const MAX_PAGES = 100;
 const PAGE_DELAY_MS = 300;
 const REFRESH_COOLDOWN_MS = 15 * 24 * 60 * 60 * 1000; // 15 days
 
@@ -238,7 +238,7 @@ async function streamAllFollowers(
   const allFetched: NormalizedFollower[] = [];
 
   try {
-    while (page < MAX_PAGES) {
+    while (true) {
       const { followers, next_cursor } = await fetchOnePage(endpoint, userId, cursor);
 
       if (followers.length > 0) {
@@ -278,7 +278,7 @@ async function streamAllFollowers(
 }
 
 // Fetch single page (backward compat)
-router.get('/followers', requireAuth, async (req: Request, res: Response) => {
+router.get('/followers', requireAuth, requirePaidAccess, async (req: Request, res: Response) => {
   const userId = req.session.user!.id;
   const { cursor } = req.query;
   try {
@@ -289,7 +289,7 @@ router.get('/followers', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.get('/verified-followers', requireAuth, async (req: Request, res: Response) => {
+router.get('/verified-followers', requireAuth, requirePaidAccess, async (req: Request, res: Response) => {
   const userId = req.session.user!.id;
   const { cursor } = req.query;
   try {
@@ -301,16 +301,16 @@ router.get('/verified-followers', requireAuth, async (req: Request, res: Respons
 });
 
 // SSE: stream ALL followers (with 15-day cooldown + DB caching)
-router.get('/followers/all', requireAuth, (req: Request, res: Response) => {
+router.get('/followers/all', requireAuth, requirePaidAccess, (req: Request, res: Response) => {
   streamAllFollowers('UserFollowers', 'all', req.session.user!.id, res);
 });
 
-router.get('/verified-followers/all', requireAuth, (req: Request, res: Response) => {
+router.get('/verified-followers/all', requireAuth, requirePaidAccess, (req: Request, res: Response) => {
   streamAllFollowers('UserVerifiedFollowers', 'verified', req.session.user!.id, res);
 });
 
 // Refresh status: lets frontend know when the next refresh is allowed
-router.get('/refresh-status', requireAuth, async (req: Request, res: Response) => {
+router.get('/refresh-status', requireAuth, requirePaidAccess, async (req: Request, res: Response) => {
   const userId = req.session.user!.id;
   const dbUser = await User.findOne({ twitterId: userId });
 

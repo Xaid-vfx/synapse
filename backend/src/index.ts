@@ -9,6 +9,10 @@ import authRouter from './routes/auth';
 import followersRouter from './routes/followers';
 import searchRouter from './routes/search';
 import enrichmentRouter from './routes/enrichment';
+import billingRouter from './routes/billing';
+import adminRouter from './routes/admin';
+import playgroundRouter from './routes/playground';
+import earlyAccessRouter from './routes/earlyAccess';
 
 dotenv.config();
 
@@ -25,6 +29,8 @@ app.use(cors({
   credentials: true,
 }));
 
+// Stripe webhook signature verification requires raw body.
+app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 const mongoUrl = process.env.MONGODB_URI;
@@ -57,6 +63,10 @@ app.use('/auth', authRouter);
 app.use('/api', followersRouter);
 app.use('/api', searchRouter);
 app.use('/api', enrichmentRouter);
+app.use('/api', billingRouter);
+app.use('/api', adminRouter);
+app.use('/api', playgroundRouter);
+app.use('/api', earlyAccessRouter);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });

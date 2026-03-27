@@ -13,6 +13,11 @@ export interface IUser extends Document {
   };
   accessToken?: string;
   refreshToken?: string;
+  hasPaidAccess?: boolean;
+  paidAt?: Date;
+  paidPlanTier?: 'starter_29' | 'growth_49' | 'scale_79';
+  stripeCustomerId?: string;
+  stripeCheckoutSessionId?: string;
   lastFollowersFetchAt?: Date;
   lastVerifiedFetchAt?: Date;
   createdAt: Date;
@@ -33,6 +38,15 @@ const UserSchema = new Schema<IUser>(
     },
     accessToken: String,
     refreshToken: String,
+    hasPaidAccess: { type: Boolean, default: false },
+    paidAt: { type: Date, default: null },
+    paidPlanTier: {
+      type: String,
+      enum: ['starter_29', 'growth_49', 'scale_79'],
+      default: null,
+    },
+    stripeCustomerId: { type: String, default: null },
+    stripeCheckoutSessionId: { type: String, default: null },
     lastFollowersFetchAt: Date,
     lastVerifiedFetchAt: Date,
   },

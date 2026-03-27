@@ -82,7 +82,13 @@ export default function Dashboard() {
   // -----------------------------------------------------------------------
   useEffect(() => {
     getMe()
-      .then(setUser)
+      .then((me) => {
+        if (!me.hasPaidAccess && !me.hasWhitelistedAccess) {
+          navigate('/pricing', { replace: true });
+          return;
+        }
+        setUser(me);
+      })
       .catch(() => navigate('/', { replace: true }));
   }, [navigate]);
 
@@ -183,6 +189,9 @@ export default function Dashboard() {
       },
       (msg) => {
         setError(msg);
+        if (msg.toLowerCase().includes('payment')) {
+          navigate('/pricing');
+        }
         setFetching(false);
       },
     );

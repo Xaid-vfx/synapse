@@ -4,11 +4,36 @@ export interface AuthUser {
   username: string;
   profileImageUrl?: string;
   description?: string;
+  hasPaidAccess?: boolean;
+  hasWhitelistedAccess?: boolean;
   publicMetrics?: {
     followers_count?: number;
     following_count?: number;
     tweet_count?: number;
   };
+}
+
+export interface BillingStatus {
+  hasPaidAccess: boolean;
+  recommendedTier: 'starter_29' | 'growth_49' | 'scale_79';
+  followersCount: number;
+}
+
+export interface PlaygroundOwner {
+  name: string;
+  username: string;
+  profileImageUrl?: string;
+  followersCount?: number | null;
+}
+
+export interface PlaygroundFollower {
+  id: string;
+  name: string;
+  screen_name: string;
+  description: string | null;
+  followers_count: number;
+  verified: boolean;
+  profile_image_url: string | null;
 }
 
 export interface TwitterFollower {

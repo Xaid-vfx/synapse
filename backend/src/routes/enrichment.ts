@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
+import { requirePaidAccess } from '../middleware/access';
 import {
   triggerEnrichment,
   getEnrichmentStatus,
@@ -10,7 +11,7 @@ import { getRateLimitStatus } from '../services/rapidApiService';
 
 const router = Router();
 
-router.get('/enrichment/status', requireAuth, async (req: Request, res: Response) => {
+router.get('/enrichment/status', requireAuth, requirePaidAccess, async (req: Request, res: Response) => {
   try {
     const userId = req.session.user!.id;
     const status = await getEnrichmentStatus(userId);
@@ -21,7 +22,7 @@ router.get('/enrichment/status', requireAuth, async (req: Request, res: Response
   }
 });
 
-router.get('/enrichment/progress', requireAuth, async (req: Request, res: Response) => {
+router.get('/enrichment/progress', requireAuth, requirePaidAccess, async (req: Request, res: Response) => {
   try {
     const userId = req.session.user!.id;
     const progress = await getEnrichmentProgress(userId);
@@ -33,7 +34,7 @@ router.get('/enrichment/progress', requireAuth, async (req: Request, res: Respon
   }
 });
 
-router.post('/enrichment/trigger', requireAuth, async (req: Request, res: Response) => {
+router.post('/enrichment/trigger', requireAuth, requirePaidAccess, async (req: Request, res: Response) => {
   try {
     const userId = req.session.user!.id;
     const result = await triggerEnrichment(userId);
@@ -44,7 +45,7 @@ router.post('/enrichment/trigger', requireAuth, async (req: Request, res: Respon
   }
 });
 
-router.post('/enrichment/retry-failed', requireAuth, async (req: Request, res: Response) => {
+router.post('/enrichment/retry-failed', requireAuth, requirePaidAccess, async (req: Request, res: Response) => {
   try {
     const userId = req.session.user!.id;
     const result = await retryFailedEnrichment(userId);

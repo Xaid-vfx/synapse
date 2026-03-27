@@ -18,6 +18,7 @@ declare module 'express-session' {
     refreshToken?: string;
     codeVerifier?: string;
     state?: string;
+    adminAuthenticated?: boolean;
   }
 }
 

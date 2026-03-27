@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { TwitterApi } from 'twitter-api-v2';
 import dotenv from 'dotenv';
 import User from '../models/User';
+import { hasAccessForUsername } from '../middleware/access';
 
 dotenv.config();
 
@@ -110,7 +111,19 @@ router.get('/me', (req: Request, res: Response) => {
   if (!req.session.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  res.json(req.session.user);
+  User.findOne({ twitterId: req.session.user.id })
+    .lean()
+    .then(async (dbUser) => {
+      const whitelisted = await hasAccessForUsername(req.session.user?.username);
+      res.json({
+        ...req.session.user,
+        hasPaidAccess: Boolean(dbUser?.hasPaidAccess),
+        hasWhitelistedAccess: whitelisted,
+      });
+    })
+    .catch(() => {
+      res.json(req.session.user);
+    });
 });
 
 // Logout
