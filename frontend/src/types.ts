@@ -15,8 +15,8 @@ export interface AuthUser {
 
 export interface BillingStatus {
   hasPaidAccess: boolean;
-  recommendedTier: 'starter_29' | 'growth_49' | 'scale_79';
   followersCount: number;
+  price: number;
 }
 
 export interface PlaygroundOwner {

@@ -18,28 +18,29 @@ const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replac
 
 const polar = polarAccessToken ? new Polar({ accessToken: polarAccessToken }) : null;
 
-type PlanTier = 'starter_29' | 'growth_49' | 'scale_79';
-
-function getPlanTierFromFollowers(followersCount: number): PlanTier {
-  if (followersCount <= 10_000) return 'starter_29';
-  if (followersCount <= 100_000) return 'growth_49';
-  return 'scale_79';
-}
-
-function getProductIdForTier(tier: PlanTier): string | undefined {
-  if (tier === 'starter_29') return process.env.POLAR_PRODUCT_ID_STARTER_29;
-  if (tier === 'growth_49') return process.env.POLAR_PRODUCT_ID_GROWTH_49;
-  return process.env.POLAR_PRODUCT_ID_SCALE_79;
+/** Returns price in USD cents based on follower count. Minimum is $4.99. */
+function calculatePrice(followers: number): number {
+  if (followers < 500)     return 4.99;
+  if (followers < 1_000)   return 7.99;
+  if (followers < 5_000)   return 14.99;
+  if (followers < 10_000)  return 24.99;
+  if (followers < 25_000)  return 34.99;
+  if (followers < 50_000)  return 44.99;
+  if (followers < 100_000) return 54.99;
+  if (followers < 250_000) return 64.99;
+  if (followers < 500_000) return 74.99;
+  if (followers < 1_000_000) return 84.99;
+  return 99.99;
 }
 
 router.get('/billing/status', requireAuth, async (req: Request, res: Response) => {
   const user = await User.findOne({ twitterId: req.session.user!.id }).lean();
   const followersCount = user?.publicMetrics?.followers_count ?? req.session.user?.publicMetrics?.followers_count ?? 0;
-  const tier = getPlanTierFromFollowers(followersCount);
+  const price = calculatePrice(followersCount);
   return res.json({
     hasPaidAccess: Boolean(user?.hasPaidAccess),
-    recommendedTier: tier,
     followersCount,
+    price,
   });
 });
 
@@ -58,24 +59,25 @@ router.post('/billing/create-checkout-session', requireAuth, async (req: Request
   }
 
   const followersCount = dbUser.publicMetrics?.followers_count ?? req.session.user?.publicMetrics?.followers_count ?? 0;
-  const tier = getPlanTierFromFollowers(followersCount);
-  const productId = getProductIdForTier(tier);
+  const price = calculatePrice(followersCount);
+  const productId = process.env.POLAR_PRODUCT_ID;
   if (!productId) {
-    return res.status(500).json({ error: `Missing Polar product configuration for ${tier}` });
+    return res.status(500).json({ error: 'Missing Polar product configuration' });
   }
 
   const checkout = await polar.checkouts.create({
     products: [productId],
+    amount: Math.round(price * 100), // Polar expects integer cents
     successUrl: `${frontendUrl}/billing/success`,
     metadata: {
       twitterId: dbUser.twitterId,
       username: dbUser.username,
-      tier,
+      price,
+      followersCount,
     },
   });
 
   dbUser.polarCheckoutId = checkout.id;
-  dbUser.paidPlanTier = tier;
   await dbUser.save();
 
   return res.json({ url: checkout.url });
@@ -100,14 +102,14 @@ router.post('/billing/webhook', async (req: Request, res: Response) => {
     const order = event.data as Record<string, unknown>;
     const meta = (order.metadata ?? {}) as Record<string, string>;
     const twitterId = meta.twitterId;
-    const tier = meta.tier as PlanTier | undefined;
     if (twitterId) {
+      const paidPrice = meta.price ? Number(meta.price) : undefined;
       await User.updateOne(
         { twitterId },
         {
           hasPaidAccess: true,
           paidAt: new Date(),
-          ...(tier ? { paidPlanTier: tier } : {}),
+          ...(paidPrice ? { paidPrice } : {}),
           polarOrderId: String(order.id ?? ''),
           ...(order.customerId ? { polarCustomerId: String(order.customerId) } : {}),
         }

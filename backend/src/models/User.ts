@@ -15,7 +15,7 @@ export interface IUser extends Document {
   refreshToken?: string;
   hasPaidAccess?: boolean;
   paidAt?: Date;
-  paidPlanTier?: 'starter_29' | 'growth_49' | 'scale_79';
+  paidPrice?: number;
   polarCustomerId?: string;
   polarCheckoutId?: string;
   polarOrderId?: string;
@@ -41,11 +41,7 @@ const UserSchema = new Schema<IUser>(
     refreshToken: String,
     hasPaidAccess: { type: Boolean, default: false },
     paidAt: { type: Date, default: null },
-    paidPlanTier: {
-      type: String,
-      enum: ['starter_29', 'growth_49', 'scale_79'],
-      default: null,
-    },
+    paidPrice: { type: Number, default: null },
     polarCustomerId: { type: String, default: null },
     polarCheckoutId: { type: String, default: null },
     polarOrderId: { type: String, default: null },
