@@ -25,6 +25,10 @@ import {
 import type { StreamDonePayload } from '../lib/api';
 import FollowerCard from '../components/FollowerCard';
 import SearchResultCard from '../components/SearchResultCard';
+import Seo from '../components/Seo';
+
+const DASHBOARD_SEO_DESC =
+  'Search and browse your X followers with semantic enrichment and reputation signals.';
 import type {
   AuthUser,
   TwitterFollower,
@@ -253,14 +257,19 @@ export default function Dashboard() {
   // -----------------------------------------------------------------------
   if (!user) {
     return (
-      <div className="min-h-screen bg-bg-dark flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
+      <>
+        <Seo title="Synapse — Dashboard" description={DASHBOARD_SEO_DESC} />
+        <div className="min-h-screen bg-bg-dark flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-bg-dark">
+    <>
+      <Seo title="Synapse — Dashboard" description={DASHBOARD_SEO_DESC} />
+      <div className="min-h-screen bg-bg-dark">
       {/* Background glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-primary/4 rounded-full blur-3xl" />
@@ -273,7 +282,7 @@ export default function Dashboard() {
             <div className="bg-primary p-1.5 rounded-lg">
               <BarChart3 className="w-4 h-4 text-bg-dark" strokeWidth={2.5} />
             </div>
-            <span className="font-extrabold tracking-tight">Follower Intel</span>
+            <span className="font-extrabold tracking-tight">Synapse</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -580,5 +589,6 @@ export default function Dashboard() {
         )}
       </main>
     </div>
+    </>
   );
 }

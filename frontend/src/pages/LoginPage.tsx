@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Users, Zap, BarChart3, AlertCircle } from 'lucide-react';
 import { getMe } from '../lib/api';
+import Seo from '../components/Seo';
+
+const LOGIN_SEO_DESC =
+  'Sign in with X to connect your account and open your follower dashboard.';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -29,14 +33,19 @@ export default function LoginPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-bg-dark flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
+      <>
+        <Seo title="Synapse — Sign in" description={LOGIN_SEO_DESC} />
+        <div className="min-h-screen bg-bg-dark flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-bg-dark flex flex-col items-center justify-center px-4 relative overflow-hidden">
+    <>
+      <Seo title="Synapse — Sign in" description={LOGIN_SEO_DESC} />
+      <div className="min-h-screen bg-bg-dark flex flex-col items-center justify-center px-4 relative overflow-hidden">
       {/* Background glow */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl" />
@@ -48,7 +57,7 @@ export default function LoginPage() {
           <div className="bg-primary p-2.5 rounded-xl">
             <BarChart3 className="w-6 h-6 text-bg-dark" strokeWidth={2.5} />
           </div>
-          <span className="text-2xl font-extrabold tracking-tight">Follower Intel</span>
+          <span className="text-2xl font-extrabold tracking-tight">Synapse</span>
         </div>
 
         {/* Main card */}
@@ -99,5 +108,6 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
