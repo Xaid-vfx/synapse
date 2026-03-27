@@ -408,8 +408,13 @@ export default function Dashboard() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder='Search followers — try "backend developers", "AI founders", "early-stage VCs"…'
-              className="w-full h-12 pl-11 pr-10 bg-bg-card border border-border-subtle rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/25 transition-all"
+              disabled={fetching}
+              placeholder={
+                fetching
+                  ? 'Syncing followers, please wait…'
+                  : 'Search followers — try "backend developers", "AI founders", "early-stage VCs"…'
+              }
+              className="w-full h-12 pl-11 pr-10 bg-bg-card border border-border-subtle rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {searching && (
               <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />
