@@ -49,10 +49,12 @@ app.get('/health', (_req, res) => {
 });
 
 async function start() {
-  await connectDB();
-  app.listen(PORT, () => {
-    console.log(`✅ Backend running at http://localhost:${PORT}`);
+  // Listen before MongoDB: Cloud Run requires the process to bind to $PORT quickly.
+  // If we await connectDB() first, a slow or unreachable Atlas cluster can block startup and fail deployment.
+  app.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`✅ Backend listening on port ${PORT}`);
   });
+  await connectDB();
 }
 
 start();
