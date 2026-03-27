@@ -29,7 +29,7 @@ app.use(cors({
   credentials: true,
 }));
 
-// Stripe webhook signature verification requires raw body.
+// Polar webhook verification requires the raw body before JSON parsing.
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 

@@ -1,15 +1,22 @@
 import { Router, Request, Response } from 'express';
-import Stripe from 'stripe';
+import { Polar } from '@polar-sh/sdk';
 import { requireAuth } from '../middleware/auth';
 import User from '../models/User';
 
+// @polar-sh/sdk/webhooks subpath isn't reachable via legacy 'node' moduleResolution — use require
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { validateEvent, WebhookVerificationError } = require('@polar-sh/sdk/dist/commonjs/webhooks') as {
+  validateEvent: (body: Buffer | string, headers: Record<string, string>, secret: string) => { type: string; data: Record<string, unknown> };
+  WebhookVerificationError: new (...args: unknown[]) => Error;
+};
+
 const router = Router();
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const polarAccessToken = process.env.POLAR_ACCESS_TOKEN;
+const webhookSecret = process.env.POLAR_WEBHOOK_SECRET;
 const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
 
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
+const polar = polarAccessToken ? new Polar({ accessToken: polarAccessToken }) : null;
 
 type PlanTier = 'starter_29' | 'growth_49' | 'scale_79';
 
@@ -19,10 +26,10 @@ function getPlanTierFromFollowers(followersCount: number): PlanTier {
   return 'scale_79';
 }
 
-function getPriceIdForTier(tier: PlanTier): string | undefined {
-  if (tier === 'starter_29') return process.env.STRIPE_PRICE_ID_STARTER_29;
-  if (tier === 'growth_49') return process.env.STRIPE_PRICE_ID_GROWTH_49;
-  return process.env.STRIPE_PRICE_ID_SCALE_79;
+function getProductIdForTier(tier: PlanTier): string | undefined {
+  if (tier === 'starter_29') return process.env.POLAR_PRODUCT_ID_STARTER_29;
+  if (tier === 'growth_49') return process.env.POLAR_PRODUCT_ID_GROWTH_49;
+  return process.env.POLAR_PRODUCT_ID_SCALE_79;
 }
 
 router.get('/billing/status', requireAuth, async (req: Request, res: Response) => {
@@ -37,8 +44,8 @@ router.get('/billing/status', requireAuth, async (req: Request, res: Response) =
 });
 
 router.post('/billing/create-checkout-session', requireAuth, async (req: Request, res: Response) => {
-  if (!stripe) {
-    return res.status(500).json({ error: 'Stripe is not configured' });
+  if (!polar) {
+    return res.status(500).json({ error: 'Polar is not configured' });
   }
 
   const dbUser = await User.findOne({ twitterId: req.session.user!.id });
@@ -52,17 +59,14 @@ router.post('/billing/create-checkout-session', requireAuth, async (req: Request
 
   const followersCount = dbUser.publicMetrics?.followers_count ?? req.session.user?.publicMetrics?.followers_count ?? 0;
   const tier = getPlanTierFromFollowers(followersCount);
-  const priceId = getPriceIdForTier(tier);
-  if (!priceId) {
-    return res.status(500).json({ error: `Missing Stripe price configuration for ${tier}` });
+  const productId = getProductIdForTier(tier);
+  if (!productId) {
+    return res.status(500).json({ error: `Missing Polar product configuration for ${tier}` });
   }
 
-  const session = await stripe.checkout.sessions.create({
-    mode: 'payment',
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${frontendUrl}/billing/success`,
-    cancel_url: `${frontendUrl}/pricing`,
-    customer_email: undefined,
+  const checkout = await polar.checkouts.create({
+    products: [productId],
+    successUrl: `${frontendUrl}/billing/success`,
     metadata: {
       twitterId: dbUser.twitterId,
       username: dbUser.username,
@@ -70,34 +74,33 @@ router.post('/billing/create-checkout-session', requireAuth, async (req: Request
     },
   });
 
-  dbUser.stripeCheckoutSessionId = session.id;
+  dbUser.polarCheckoutId = checkout.id;
   dbUser.paidPlanTier = tier;
   await dbUser.save();
 
-  return res.json({ url: session.url });
+  return res.json({ url: checkout.url });
 });
 
 router.post('/billing/webhook', async (req: Request, res: Response) => {
-  if (!stripe || !webhookSecret) {
-    return res.status(500).send('Stripe webhook not configured');
+  if (!webhookSecret) {
+    return res.status(500).send('Polar webhook not configured');
   }
 
-  const signature = req.headers['stripe-signature'];
-  if (!signature || typeof signature !== 'string') {
-    return res.status(400).send('Missing stripe-signature header');
-  }
-
-  let event: Stripe.Event;
+  let event: { type: string; data: Record<string, unknown> };
   try {
-    event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
-  } catch (err: any) {
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    event = validateEvent(req.body as Buffer, req.headers as Record<string, string>, webhookSecret);
+  } catch (err) {
+    if (err instanceof WebhookVerificationError) {
+      return res.status(403).send('Webhook verification failed');
+    }
+    return res.status(400).send('Invalid webhook payload');
   }
 
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as Stripe.Checkout.Session;
-    const twitterId = session.metadata?.twitterId;
-    const tier = session.metadata?.tier as PlanTier | undefined;
+  if (event.type === 'order.created') {
+    const order = event.data as Record<string, unknown>;
+    const meta = (order.metadata ?? {}) as Record<string, string>;
+    const twitterId = meta.twitterId;
+    const tier = meta.tier as PlanTier | undefined;
     if (twitterId) {
       await User.updateOne(
         { twitterId },
@@ -105,8 +108,8 @@ router.post('/billing/webhook', async (req: Request, res: Response) => {
           hasPaidAccess: true,
           paidAt: new Date(),
           ...(tier ? { paidPlanTier: tier } : {}),
-          ...(session.customer ? { stripeCustomerId: String(session.customer) } : {}),
-          stripeCheckoutSessionId: session.id,
+          polarOrderId: String(order.id ?? ''),
+          ...(order.customerId ? { polarCustomerId: String(order.customerId) } : {}),
         }
       );
     }

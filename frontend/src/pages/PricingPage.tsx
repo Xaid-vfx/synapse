@@ -96,7 +96,7 @@ export default function PricingPage() {
               disabled={startingCheckout}
               className="bg-primary text-bg-dark font-bold px-8 py-3 rounded-xl disabled:opacity-60"
             >
-              {startingCheckout ? 'Redirecting to Stripe...' : 'Unlock My Follower Intelligence'}
+              {startingCheckout ? 'Redirecting to Polar...' : 'Unlock My Follower Intelligence'}
             </button>
           </div>
 

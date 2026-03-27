@@ -16,8 +16,9 @@ export interface IUser extends Document {
   hasPaidAccess?: boolean;
   paidAt?: Date;
   paidPlanTier?: 'starter_29' | 'growth_49' | 'scale_79';
-  stripeCustomerId?: string;
-  stripeCheckoutSessionId?: string;
+  polarCustomerId?: string;
+  polarCheckoutId?: string;
+  polarOrderId?: string;
   lastFollowersFetchAt?: Date;
   lastVerifiedFetchAt?: Date;
   createdAt: Date;
@@ -45,8 +46,9 @@ const UserSchema = new Schema<IUser>(
       enum: ['starter_29', 'growth_49', 'scale_79'],
       default: null,
     },
-    stripeCustomerId: { type: String, default: null },
-    stripeCheckoutSessionId: { type: String, default: null },
+    polarCustomerId: { type: String, default: null },
+    polarCheckoutId: { type: String, default: null },
+    polarOrderId: { type: String, default: null },
     lastFollowersFetchAt: Date,
     lastVerifiedFetchAt: Date,
   },
