@@ -5,6 +5,7 @@ import PricingPage from './pages/PricingPage';
 import BillingSuccessPage from './pages/BillingSuccessPage';
 import AdminWhitelistPage from './pages/AdminWhitelistPage';
 import PlaygroundPage from './pages/PlaygroundPage';
+import DemoPage from './pages/DemoPage';
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/playground" element={<PlaygroundPage />} />
         <Route path="/playground/:username" element={<PlaygroundPage />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/demo" element={<DemoPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
