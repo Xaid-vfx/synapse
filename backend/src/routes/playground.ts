@@ -39,8 +39,18 @@ router.get('/playground/:username', async (req: Request, res: Response) => {
     return res.status(code).json({ error: resolved.error });
   }
   const { owner } = resolved;
+  const page = Math.max(parseInt(String(req.query.page || '1'), 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit || '100'), 10) || 100, 1), 100);
+  const skip = (page - 1) * limit;
 
-  const followers = await Follower.find({ userId: owner.twitterId, type: 'all' }).lean();
+  const [followers, totalFollowers] = await Promise.all([
+    Follower.find({ userId: owner.twitterId, type: 'all' })
+      .sort({ followers_count: -1, _id: 1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    Follower.countDocuments({ userId: owner.twitterId, type: 'all' }),
+  ]);
 
   return res.json({
     owner: {
@@ -58,6 +68,12 @@ router.get('/playground/:username', async (req: Request, res: Response) => {
       verified: f.verified,
       profile_image_url: f.profile_image_url,
     })),
+    pagination: {
+      page,
+      limit,
+      total: totalFollowers,
+      hasMore: skip + followers.length < totalFollowers,
+    },
   });
 });
 

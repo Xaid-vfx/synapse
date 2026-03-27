@@ -11,6 +11,10 @@ export default function PlaygroundPage() {
   const username = params.username || 'anaskhan';
   const [owner, setOwner] = useState<PlaygroundOwner | null>(null);
   const [followers, setFollowers] = useState<PlaygroundFollower[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalFollowers, setTotalFollowers] = useState(0);
+  const [hasMoreFollowers, setHasMoreFollowers] = useState(false);
+  const [loadingMoreFollowers, setLoadingMoreFollowers] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -32,9 +36,12 @@ export default function PlaygroundPage() {
       }
 
       try {
-        const data = await getPlaygroundData(username);
+        const data = await getPlaygroundData(username, 1, 100);
         setOwner(data.owner);
         setFollowers(data.followers);
+        setCurrentPage(data.pagination.page);
+        setTotalFollowers(data.pagination.total);
+        setHasMoreFollowers(data.pagination.hasMore);
       } catch (err: any) {
         setError(err?.response?.data?.error || 'Unable to load playground data');
       } finally {
@@ -71,6 +78,23 @@ export default function PlaygroundPage() {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
   }, [searchQuery, username]);
+
+  const loadMoreFollowers = async () => {
+    if (loadingMoreFollowers || !hasMoreFollowers || error) return;
+    setLoadingMoreFollowers(true);
+    try {
+      const nextPage = currentPage + 1;
+      const data = await getPlaygroundData(username, nextPage, 100);
+      setFollowers((prev) => [...prev, ...data.followers]);
+      setCurrentPage(data.pagination.page);
+      setTotalFollowers(data.pagination.total);
+      setHasMoreFollowers(data.pagination.hasMore);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Unable to load more followers');
+    } finally {
+      setLoadingMoreFollowers(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -163,7 +187,7 @@ export default function PlaygroundPage() {
             ) : (
               <>
                 <p className="text-xs text-slate-400 mt-3">
-                  Showing full follower list ({followers.length}). Search runs on the full vectorized follower set.
+                  Showing {followers.length} of {totalFollowers} followers. Search runs on the full vectorized follower set.
                 </p>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                   {followers.map((follower) => (
@@ -184,6 +208,18 @@ export default function PlaygroundPage() {
                     </div>
                   ))}
                 </div>
+                {hasMoreFollowers && (
+                  <div className="mt-5 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={loadMoreFollowers}
+                      disabled={loadingMoreFollowers}
+                      className="px-4 py-2 rounded-lg border border-border-subtle text-sm text-slate-200 hover:bg-white/5 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {loadingMoreFollowers ? 'Loading...' : 'Load 100 more'}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>

@@ -8,8 +8,7 @@ import type {
   EnrichmentProgress,
   EnrichmentStatusResponse,
   BillingStatus,
-  PlaygroundFollower,
-  PlaygroundOwner,
+  PlaygroundDataResponse,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
@@ -211,11 +210,13 @@ export async function backfillAndWhitelistUsername(
 
 export async function getPlaygroundData(
   username: string,
-): Promise<{ owner: PlaygroundOwner; followers: PlaygroundFollower[] }> {
+  page = 1,
+  limit = 100,
+): Promise<PlaygroundDataResponse> {
   const clean = username.trim().replace(/^@/, '');
-  const res = await api.get<{ owner: PlaygroundOwner; followers: PlaygroundFollower[] }>(
-    `/api/playground/${encodeURIComponent(clean)}`
-  );
+  const res = await api.get<PlaygroundDataResponse>(`/api/playground/${encodeURIComponent(clean)}`, {
+    params: { page, limit },
+  });
   return res.data;
 }
 

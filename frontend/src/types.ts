@@ -36,6 +36,19 @@ export interface PlaygroundFollower {
   profile_image_url: string | null;
 }
 
+export interface PlaygroundPagination {
+  page: number;
+  limit: number;
+  total: number;
+  hasMore: boolean;
+}
+
+export interface PlaygroundDataResponse {
+  owner: PlaygroundOwner;
+  followers: PlaygroundFollower[];
+  pagination: PlaygroundPagination;
+}
+
 export interface TwitterFollower {
   id: string;
   name: string;
