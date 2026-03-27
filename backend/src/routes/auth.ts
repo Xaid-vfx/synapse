@@ -8,7 +8,7 @@ dotenv.config();
 const router = Router();
 
 const CALLBACK_URL = process.env.TWITTER_CALLBACK_URL || 'http://localhost:3001/auth/twitter/callback';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
 const SCOPES = ['users.read', 'tweet.read', 'follows.read', 'offline.access'];
 
 function getTwitterClient() {
@@ -29,7 +29,14 @@ router.get('/twitter', async (req: Request, res: Response) => {
     req.session.codeVerifier = codeVerifier;
     req.session.state = state;
 
-    res.redirect(url);
+    // Persist session before redirect so OAuth callback still has state / codeVerifier (connect-mongo is async).
+    req.session.save((saveErr) => {
+      if (saveErr) {
+        console.error('Session save failed before Twitter redirect:', saveErr);
+        return res.redirect(`${FRONTEND_URL}?error=auth_init_failed`);
+      }
+      res.redirect(url);
+    });
   } catch (error) {
     console.error('Error initiating Twitter OAuth:', error);
     res.redirect(`${FRONTEND_URL}?error=auth_init_failed`);

@@ -15,8 +15,13 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Cloud Run / load balancers: required for correct req.secure and cookies behind HTTPS
+app.set('trust proxy', 1);
+
+const frontendOrigin = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: frontendOrigin,
   credentials: true,
 }));
 
