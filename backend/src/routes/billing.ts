@@ -1,14 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { Polar } from '@polar-sh/sdk';
+import { validateEvent, WebhookVerificationError } from '@polar-sh/sdk/webhooks';
 import { requireAuth } from '../middleware/auth';
 import User from '../models/User';
-
-// @polar-sh/sdk/webhooks subpath isn't reachable via legacy 'node' moduleResolution — use require
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { validateEvent, WebhookVerificationError } = require('@polar-sh/sdk/dist/commonjs/webhooks') as {
-  validateEvent: (body: Buffer | string, headers: Record<string, string>, secret: string) => { type: string; data: Record<string, unknown> };
-  WebhookVerificationError: new (...args: unknown[]) => Error;
-};
 
 const router = Router();
 
