@@ -5,6 +5,7 @@ import {
   adminLogin,
   adminLogout,
   adminStatus,
+  getEarlyAccessLeads,
   getWhitelistedUsernames,
   removeWhitelistedUsername,
 } from '../lib/api';
@@ -16,6 +17,7 @@ export default function AdminWhitelistPage() {
   const [inputUsername, setInputUsername] = useState('');
   const [backfillUsername, setBackfillUsername] = useState('');
   const [usernames, setUsernames] = useState<string[]>([]);
+  const [leads, setLeads] = useState<Array<{ email: string; source: string; createdAt: string }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
@@ -25,12 +27,19 @@ export default function AdminWhitelistPage() {
     setUsernames(list);
   };
 
+  const loadLeads = async () => {
+    const rows = await getEarlyAccessLeads();
+    setLeads(rows);
+  };
+
   useEffect(() => {
     (async () => {
       try {
         const status = await adminStatus();
         setAuthenticated(status.authenticated);
-        if (status.authenticated) await loadList();
+        if (status.authenticated) {
+          await Promise.all([loadList(), loadLeads()]);
+        }
       } catch {
         // no-op
       }
@@ -42,7 +51,7 @@ export default function AdminWhitelistPage() {
     try {
       await adminLogin(username, password);
       setAuthenticated(true);
-      await loadList();
+      await Promise.all([loadList(), loadLeads()]);
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Login failed');
     }
@@ -180,6 +189,33 @@ export default function AdminWhitelistPage() {
             </div>
           ))}
           {usernames.length === 0 && <p className="text-slate-500 text-sm">No usernames whitelisted yet.</p>}
+        </div>
+
+        <div className="glass rounded-xl p-4 mt-8">
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-semibold text-sm">Early access signups</p>
+            <button
+              onClick={loadLeads}
+              className="text-xs text-slate-400 hover:text-white transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            People who signed up directly from landing page.
+          </p>
+
+          <div className="mt-3 space-y-2">
+            {leads.map((lead) => (
+              <div key={`${lead.email}-${lead.createdAt}`} className="bg-bg-card border border-border-subtle rounded-lg px-3 py-2">
+                <p className="text-sm font-medium">{lead.email}</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {lead.source} · {new Date(lead.createdAt).toLocaleString()}
+                </p>
+              </div>
+            ))}
+            {leads.length === 0 && <p className="text-slate-500 text-sm">No early access signups yet.</p>}
+          </div>
         </div>
       </div>
     </div>

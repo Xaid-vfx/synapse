@@ -178,6 +178,13 @@ export async function getWhitelistedUsernames(): Promise<string[]> {
   return res.data.usernames;
 }
 
+export async function getEarlyAccessLeads(): Promise<Array<{ email: string; source: string; createdAt: string }>> {
+  const res = await api.get<{ leads: Array<{ email: string; source: string; createdAt: string }> }>(
+    '/api/admin/early-access'
+  );
+  return res.data.leads;
+}
+
 export async function addWhitelistedUsername(username: string): Promise<void> {
   await api.post('/api/admin/whitelist', { username });
 }

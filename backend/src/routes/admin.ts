@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import axios from 'axios';
 import { TwitterApi } from 'twitter-api-v2';
 import AccessGrant from '../models/AccessGrant';
+import EarlyAccessLead from '../models/EarlyAccessLead';
 import User from '../models/User';
 import Follower from '../models/Follower';
 import { requireAdminSession } from '../middleware/access';
@@ -203,6 +204,20 @@ router.get('/admin/whitelist', requireAdminSession, async (_req: Request, res: R
   const items = await AccessGrant.find({ active: true }).sort({ createdAt: -1 }).lean();
   return res.json({
     usernames: items.map((item) => item.username),
+  });
+});
+
+router.get('/admin/early-access', requireAdminSession, async (_req: Request, res: Response) => {
+  const leads = await EarlyAccessLead.find({})
+    .sort({ createdAt: -1 })
+    .lean();
+
+  return res.json({
+    leads: leads.map((lead) => ({
+      email: lead.email,
+      source: lead.source,
+      createdAt: lead.createdAt,
+    })),
   });
 });
 
