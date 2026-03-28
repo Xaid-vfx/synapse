@@ -14,6 +14,7 @@ const polar = polarAccessToken ? new Polar({ accessToken: polarAccessToken }) : 
 
 /** Returns price in USD cents based on follower count. Minimum is $4.99. */
 function calculatePrice(followers: number): number {
+  if (followers < 10)      return 0.50; // test tier
   if (followers < 500)     return 4.99;
   if (followers < 1_000)   return 7.99;
   if (followers < 5_000)   return 14.99;
