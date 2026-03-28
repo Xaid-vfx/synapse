@@ -114,6 +114,13 @@ export default function PricingPage() {
           <p className="text-xs text-slate-600 mt-4">
             Price scales with audience size. Larger accounts require deeper processing.
           </p>
+
+          <button
+            onClick={() => window.location.href = '/playground/anaskhan'}
+            className="w-full mt-3 border border-border-subtle text-slate-400 py-3 rounded-xl text-sm hover:bg-white/5 transition-colors"
+          >
+            Preview the dashboard first → try playground demo
+          </button>
         </div>
       </div>
     </>
