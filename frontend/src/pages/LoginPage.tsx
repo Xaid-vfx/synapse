@@ -124,7 +124,7 @@ export default function LoginPage() {
                 onClick={() => navigate('/playground/anaskhan')}
                 className="w-full mt-3 border border-border-subtle text-slate-300 py-3 rounded-xl text-sm hover:bg-white/5 transition-colors"
               >
-                Try playground demo (@anaskhan)
+                Try playground demo
               </button>
             </div>
 

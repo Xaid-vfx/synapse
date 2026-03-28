@@ -255,20 +255,25 @@ async function streamAllFollowers(
 
     await saveFollowersToDB(userId, type, allFetched);
 
-    await User.updateOne(
-      { twitterId: userId },
-      { [lastFetchField]: new Date() }
-    );
-
-    // Trigger background enrichment pipeline after fresh sync
-    if (type === 'all') {
-      triggerEnrichment(userId).catch((err) =>
-        console.error('[Enrichment] Auto-trigger failed:', err.message),
+    // Only stamp the cooldown if we actually got followers — no point locking
+    // an empty result for 15 days since there's nothing cached to serve.
+    let nextRefreshAt: string | undefined;
+    if (total > 0) {
+      await User.updateOne(
+        { twitterId: userId },
+        { [lastFetchField]: new Date() }
       );
+      nextRefreshAt = new Date(Date.now() + REFRESH_COOLDOWN_MS).toISOString();
+
+      // Trigger background enrichment pipeline after fresh sync
+      if (type === 'all') {
+        triggerEnrichment(userId).catch((err) =>
+          console.error('[Enrichment] Auto-trigger failed:', err.message),
+        );
+      }
     }
 
-    const nextRefreshAt = new Date(Date.now() + REFRESH_COOLDOWN_MS).toISOString();
-    send('done', { total, fromCache: false, nextRefreshAt });
+    send('done', { total, fromCache: false, ...(nextRefreshAt ? { nextRefreshAt } : {}) });
   } catch (err: any) {
     console.error(`${endpoint} stream error:`, err.response?.data || err.message);
     send('error', { message: err.response?.data?.message || err.message });
