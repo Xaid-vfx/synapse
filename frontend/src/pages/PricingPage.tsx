@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createCheckoutSession, getBillingStatus, getMe } from '../lib/api';
+import { createCheckoutSession, getBillingStatus, getMe, logout } from '../lib/api';
 import Seo from '../components/Seo';
 
 export default function PricingPage() {
@@ -120,6 +120,13 @@ export default function PricingPage() {
             className="w-full mt-3 border border-border-subtle text-slate-400 py-3 rounded-xl text-sm hover:bg-white/5 transition-colors"
           >
             Preview the dashboard first → try playground demo
+          </button>
+
+          <button
+            onClick={async () => { await logout(); navigate('/', { replace: true }); }}
+            className="w-full mt-3 text-slate-600 text-sm hover:text-slate-400 transition-colors"
+          >
+            Sign out
           </button>
         </div>
       </div>

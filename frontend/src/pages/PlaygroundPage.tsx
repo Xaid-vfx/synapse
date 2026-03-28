@@ -22,6 +22,7 @@ export default function PlaygroundPage() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState<'unauthenticated' | 'unpaid' | 'paid'>('unauthenticated');
 
   useEffect(() => {
     (async () => {
@@ -31,8 +32,9 @@ export default function PlaygroundPage() {
           navigate('/dashboard', { replace: true });
           return;
         }
+        setAuthState('unpaid');
       } catch {
-        // allow unauthenticated users to see playground
+        setAuthState('unauthenticated');
       }
 
       try {
@@ -115,13 +117,32 @@ export default function PlaygroundPage() {
     );
   }
 
+  const handleCtaClick = () => {
+    if (authState === 'unpaid') navigate('/pricing');
+    else navigate('/');
+  };
+
+  const ctaLabel = authState === 'unpaid'
+    ? 'Unlock your own dashboard →'
+    : 'Get started — analyse your own audience →';
+
   return (
     <div className="min-h-screen bg-bg-dark text-white px-6 py-10">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-extrabold">Synapse Playground</h1>
-        <p className="text-slate-400 text-sm mt-2">
-          Explore a sample follower intelligence view for @{username}. Unlock full access to analyze your own audience.
-        </p>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-extrabold">Synapse Playground</h1>
+            <p className="text-slate-400 text-sm mt-2">
+              Explore a sample follower intelligence view for @{username}. Unlock full access to analyse your own audience.
+            </p>
+          </div>
+          <button
+            onClick={handleCtaClick}
+            className="shrink-0 bg-primary text-bg-dark font-bold px-5 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity"
+          >
+            {ctaLabel}
+          </button>
+        </div>
 
         {!error && owner && (
           <div className="glass rounded-xl p-5 mt-6 flex items-center gap-4">
